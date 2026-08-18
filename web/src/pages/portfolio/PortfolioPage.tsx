@@ -34,7 +34,7 @@ export default function PortfolioPage() {
       setGenerating(false);
       // Build overrides map
       const overrideMap: Record<number, AssessorOverride> = {};
-      data.portfolio.overrides.forEach((o: AssessorOverride) => {
+      (data.portfolio.overrides || []).forEach((o: AssessorOverride) => {
         overrideMap[o.portfolio_skill_id] = o;
       });
       setOverrides(overrideMap);
@@ -44,8 +44,8 @@ export default function PortfolioPage() {
   useEffect(() => {
     Promise.all([fetchPortfolio(), vacanciesApi.list(), sessionsApi.get(Number(sessionId))])
       .then(([, vRes, sRes]) => {
-        setVacancies(vRes.data.vacancies);
-        setCandidateName(sRes.data.session.candidate_name ?? null);
+        setVacancies(vRes.data?.vacancies ?? []);
+        setCandidateName(sRes.data?.session?.candidate_name ?? null);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
