@@ -21,5 +21,22 @@ RSpec.describe Sessions::EndHandler do
       expect(ended_session.portfolio).to be_present
       expect(ended_session.portfolio.generation_status).to eq('pending')
     end
+
+    it 'is idempotent and does not recreate portfolio or duplicate jobs for ended sessions' do
+      subject.call(reason: 'all_covered')
+
+      expect(PortfolioGeneratorWorker).not_to receive(:perform_async)
+      second_call = subject.call(reason: 'manual_candidate')
+
+      expect(second_call.status).to eq('ended')
+      expect(second_call.end_reason).to eq('all_covered')
+    end
+
+    it 'allows upgrading an error termination to clean manual reason' do
+      session.update!(status: 'ended', end_reason: 'error', ended_at: Time.current)
+
+      upgraded = subject.call(reason: 'manual_candidate')
+      expect(upgraded.end_reason).to eq('manual_candidate')
+    end
   end
 end

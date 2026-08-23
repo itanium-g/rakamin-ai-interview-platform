@@ -12,18 +12,18 @@ module Sessions
     end
 
     def call(reason: 'manual_assessor')
-      # Allow upgrading end_reason from 'error' to a manual reason (candidate/assessor ended cleanly)
-      if @session.ended?
-        manual = %w[manual_candidate manual_assessor]
-        if manual.include?(reason.to_s) && @session.end_reason == 'error'
-          @session.update_column(:end_reason, reason.to_s)
-        end
-        return @session
-      end
-
       reason = 'manual_assessor' unless VALID_REASONS.include?(reason.to_s)
 
-      ActiveRecord::Base.transaction do
+      @session.with_lock do
+        # Allow upgrading end_reason from 'error' to a manual reason (candidate/assessor ended cleanly)
+        if @session.ended?
+          manual = %w[manual_candidate manual_assessor]
+          if manual.include?(reason.to_s) && @session.end_reason == 'error'
+            @session.update_column(:end_reason, reason.to_s)
+          end
+          return @session
+        end
+
         duration = @session.started_at ? (Time.current - @session.started_at).to_i : nil
 
         @session.update!(
@@ -74,6 +74,8 @@ module Sessions
 
       PortfolioGeneratorWorker.perform_async(@session.id)
       Rails.logger.info("[N9/EndHandler] Enqueued N10 for session #{@session.id}")
+    rescue => e
+      Rails.logger.error("[N9/EndHandler] Failed to enqueue PortfolioGeneratorWorker for session #{@session.id}: #{e.message}")
     end
   end
 end
